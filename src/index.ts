@@ -53,6 +53,18 @@ app.get("/books", async (req: Request, res: Response) => {
     res.status(500).json({ message: "Failed to fetch books from database" });
   }
 });
+app.get("/books/latest", async (req, res) => {
+  try {
+    const books = await db.collection("books")
+      .find()
+      .sort({ addedDate: -1 })
+      .limit(6)
+      .toArray();
+    res.send(books);
+  } catch (error) {
+    res.status(500).json({ message: "Failed to fetch latest books" });
+  }
+});
 
 app.get("/books/:id", async (req: Request, res: Response) => {
   try {
