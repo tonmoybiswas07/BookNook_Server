@@ -82,6 +82,36 @@ app.get("/books/:id", async (req: Request, res: Response) => {
   }
 });
 
+app.get(
+  "/my-books",
+
+  async (req: Request, res: Response) => {
+    try {
+      const email = req.headers["x-user-email"] as string;
+
+      if (!email) {
+        return res.status(400).json({
+          message: "User email is required",
+        });
+      }
+
+      const books = await db
+        .collection("books")
+        .find({ userEmail: email })
+        .sort({ addedDate: -1 })
+        .toArray();
+
+      res.status(200).json(books);
+    } catch (error) {
+      console.error("My Books Error:", error);
+
+      res.status(500).json({
+        message: "Failed to fetch your books",
+      });
+    }
+  }
+);
+
 app.listen(port, () => {
   console.log(`Server is running on port ${port}`);
 });
