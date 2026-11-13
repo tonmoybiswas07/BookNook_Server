@@ -236,6 +236,114 @@ app.delete("/books/:id", async (req: Request, res: Response) => {
   }
 });
 
+app.post("/borrows", async (req: Request, res: Response) => {
+  const session = client.startSession();
+
+  try {
+    const { bookId, userEmail } = req.body;
+
+    if (
+      typeof bookId !== "string" ||
+      !ObjectId.isValid(bookId) ||
+      typeof userEmail !== "string" ||
+      !userEmail.trim()
+    ) {
+      return res.status(400).json({
+        message: "Valid book ID and user email are required",
+      });
+    }
+
+    const email = userEmail.trim().toLowerCase();
+
+    const booksCollection = db.collection("books");
+    const borrowsCollection = db.collection("borrows");
+
+    let borrowResult;
+
+    await session.withTransaction(async () => {
+      const alreadyBorrowed = await borrowsCollection.findOne(
+        {
+          bookId,
+          userEmail: email,
+        },
+        { session }
+      );
+
+      if (alreadyBorrowed) {
+        throw new Error("ALREADY_BORROWED");
+      }
+
+      const book = await booksCollection.findOneAndUpdate(
+        {
+          _id: new ObjectId(bookId),
+          totalCopies: { $gt: 0 },
+        },
+        {
+          $inc: { totalCopies: -1 },
+        },
+        {
+          returnDocument: "before",
+          session,
+        }
+      );
+
+      if (!book) {
+        throw new Error("BOOK_NOT_AVAILABLE");
+      }
+
+      const borrowDate = new Date();
+
+      const returnDate = new Date(borrowDate);
+      returnDate.setDate(returnDate.getDate() + 7);
+
+      const borrowData = {
+        bookId,
+        bookTitle: book.title,
+        bookImage: book.image,
+        userEmail: email,
+        borrowDate: borrowDate.toISOString(),
+        returnDate: returnDate.toISOString(),
+      };
+
+      borrowResult = await borrowsCollection.insertOne(
+        borrowData,
+        { session }
+      );
+    });
+
+    return res.status(201).json({
+      message: "Book borrowed successfully",
+      result: borrowResult,
+    });
+  } catch (error) {
+    if (
+      error instanceof Error &&
+      error.message === "ALREADY_BORROWED"
+    ) {
+      return res.status(409).json({
+        message: "You have already borrowed this book",
+      });
+    }
+
+    if (
+      error instanceof Error &&
+      error.message === "BOOK_NOT_AVAILABLE"
+    ) {
+      return res.status(409).json({
+        message: "Book is not available",
+      });
+    }
+
+    console.error("Borrow Error:", error);
+
+    return res.status(500).json({
+      message: "Failed to borrow book",
+    });
+  } finally {
+    await session.endSession();
+  }
+});
+
 
 
 
