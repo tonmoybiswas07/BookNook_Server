@@ -374,6 +374,48 @@ app.get("/borrows", async (req: Request, res: Response) => {
 });
 
 
+app.delete("/borrows/:id", async (req: Request, res: Response) => {
+  try {
+    const id = req.params.id;
+    const email = req.headers["x-user-email"];
+
+    if (typeof id !== "string" || !ObjectId.isValid(id)) {
+      return res.status(400).json({
+        message: "Invalid borrow ID",
+      });
+    }
+
+    if (typeof email !== "string" || !email.trim()) {
+      return res.status(400).json({
+        message: "User email is required",
+      });
+    }
+
+    const result = await db.collection("borrows").deleteOne({
+      _id: new ObjectId(id),
+      userEmail: email.trim().toLowerCase(),
+    });
+
+    if (result.deletedCount === 0) {
+      return res.status(404).json({
+        message: "Borrow record not found",
+      });
+    }
+
+    return res.status(200).json({
+      message: "Borrow deleted successfully",
+      deletedCount: result.deletedCount,
+    });
+  } catch (error) {
+    console.error("Delete Borrow Error:", error);
+
+    return res.status(500).json({
+      message: "Failed to delete borrow",
+    });
+  }
+});
+
+
 
 
 
