@@ -44,6 +44,16 @@ app.post("/books", async (req: Request, res: Response) => {
   }
 });
 
+app.get("/books", async (req: Request, res: Response) => {
+  try {
+    const books = await db.collection("books").find().toArray();
+    res.status(200).json(books);
+  } catch (error) {
+    console.error("Error fetching books:", error);
+    res.status(500).json({ message: "Failed to fetch books from database" });
+  }
+});
+
 app.listen(port, () => {
   console.log(`Server is running on port ${port}`);
 });
