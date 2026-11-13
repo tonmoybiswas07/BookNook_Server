@@ -70,14 +70,14 @@ app.get("/books/:id", async (req: Request, res: Response) => {
   try {
     const id = req.params.id;
 
-    if (!ObjectId.isValid(id)) {
+    if (!ObjectId.isValid(id as string)) {
       return res.status(400).json({
         message: "Invalid book ID",
       });
     }
 
     const book = await db.collection("books").findOne({
-      _id: new ObjectId(id),
+      _id: new ObjectId(id as string),
     });
 
     if (!book) {
@@ -94,8 +94,7 @@ app.get("/books/:id", async (req: Request, res: Response) => {
   }
 });
 
-app.get(
-  "/my-books",
+app.get("/my-books",
 
   async (req: Request, res: Response) => {
     try {
@@ -123,6 +122,122 @@ app.get(
     }
   }
 );
+
+app.patch("/books/:id", async (req: Request, res: Response) => {
+  try {
+    const id = req.params.id;
+    const email = req.headers["x-user-email"];
+
+    if (typeof id !== "string" || !ObjectId.isValid(id)) {
+      return res.status(400).json({
+        message: "Invalid book ID",
+      });
+    }
+
+    if (typeof email !== "string" || !email) {
+      return res.status(401).json({
+        message: "User email is required",
+      });
+    }
+
+    const {
+      title,
+      author,
+      category,
+      image,
+      description,
+      totalCopies,
+    } = req.body;
+
+    if (
+      [title, author, category, image, description].some(
+        (value) => typeof value !== "string" || !value.trim()
+      ) ||
+      !Number.isInteger(totalCopies) ||
+      totalCopies < 0
+    ) {
+      return res.status(400).json({
+        message: "Invalid book information",
+      });
+    }
+
+    const result = await db.collection("books").updateOne(
+      {
+        _id: new ObjectId(id),
+        userEmail: email,
+      },
+      {
+        $set: {
+          title: title.trim(),
+          author: author.trim(),
+          category: category.trim(),
+          image: image.trim(),
+          description: description.trim(),
+          totalCopies,
+        },
+      }
+    );
+
+    if (result.matchedCount === 0) {
+      return res.status(404).json({
+        message: "Book not found or unauthorized",
+      });
+    }
+
+    return res.status(200).json({
+      message: "Book updated successfully",
+    });
+  } catch (error) {
+    console.error("Update Error:", error);
+
+    return res.status(500).json({
+      message: "Failed to update book",
+    });
+  }
+});
+
+app.delete("/books/:id", async (req: Request, res: Response) => {
+  try {
+    const id = req.params.id;
+    const email = req.headers["x-user-email"];
+
+    if (typeof id !== "string" || !ObjectId.isValid(id)) {
+      return res.status(400).json({
+        message: "Invalid book ID",
+      });
+    }
+
+    if (typeof email !== "string" || !email) {
+      return res.status(401).json({
+        message: "User email is required",
+      });
+    }
+
+    const result = await db.collection("books").deleteOne({
+      _id: new ObjectId(id),
+      userEmail: email,
+    });
+
+    if (result.deletedCount === 0) {
+      return res.status(404).json({
+        message: "Book not found or unauthorized",
+      });
+    }
+
+    return res.status(200).json({
+      message: "Book deleted successfully",
+    });
+  } catch (error) {
+    console.error("Delete Error:", error);
+
+    return res.status(500).json({
+      message: "Failed to delete book",
+    });
+  }
+});
+
+
+
 
 app.listen(port, () => {
   console.log(`Server is running on port ${port}`);
