@@ -416,6 +416,76 @@ app.delete("/borrows/:id", async (req: Request, res: Response) => {
 });
 
 
+app.patch("/borrows/:id/return", async (req: Request, res: Response) => {
+  const session = client.startSession();
+
+  try {
+    const id = req.params.id;
+    const email = req.headers["x-user-email"];
+
+    if (typeof id !== "string" || !ObjectId.isValid(id)) {
+      return res.status(400).json({
+        message: "Invalid borrow ID",
+      });
+    }
+
+    if (typeof email !== "string" || !email.trim()) {
+      return res.status(400).json({
+        message: "User email is required",
+      });
+    }
+
+    await session.withTransaction(async () => {
+      const borrow = await db.collection("borrows").findOneAndDelete(
+        {
+          _id: new ObjectId(id),
+          userEmail: email.trim().toLowerCase(),
+        },
+        { session }
+      );
+
+      if (!borrow) {
+        throw new Error("BORROW_NOT_FOUND");
+      }
+
+      const result = await db.collection("books").updateOne(
+        {
+          _id: new ObjectId(borrow.bookId),
+        },
+        {
+          $inc: { totalCopies: 1 },
+        },
+        { session }
+      );
+
+      if (result.matchedCount === 0) {
+        throw new Error("BOOK_NOT_FOUND");
+      }
+    });
+
+    return res.status(200).json({
+      message: "Book returned successfully",
+    });
+  } catch (error) {
+    if (
+      error instanceof Error &&
+      error.message === "BORROW_NOT_FOUND"
+    ) {
+      return res.status(404).json({
+        message: "Borrow record not found",
+      });
+    }
+
+    console.error("Return Book Error:", error);
+
+    return res.status(500).json({
+      message: "Failed to return book",
+    });
+  } finally {
+    await session.endSession();
+  }
+});
+
 
 
 
