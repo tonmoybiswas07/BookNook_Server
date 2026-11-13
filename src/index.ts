@@ -345,6 +345,36 @@ app.post("/borrows", async (req: Request, res: Response) => {
 });
 
 
+app.get("/borrows", async (req: Request, res: Response) => {
+  try {
+    const email = req.query.email;
+
+    if (typeof email !== "string" || !email.trim()) {
+      return res.status(400).json({
+        message: "User email is required",
+      });
+    }
+
+    const result = await db
+      .collection("borrows")
+      .find({
+        userEmail: email.trim().toLowerCase(),
+      })
+      .sort({ borrowDate: -1 })
+      .toArray();
+
+    return res.status(200).json(result);
+  } catch (error) {
+    console.error("Get Borrows Error:", error);
+
+    return res.status(500).json({
+      message: "Failed to fetch borrowed books",
+    });
+  }
+});
+
+
+
 
 
 app.listen(port, () => {
